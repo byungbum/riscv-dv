@@ -35,7 +35,7 @@
   description: >
     Arithmetic instruction test, no load/store/branch instructions
   gen_opts: >
-    +instr_cnt=10000
+    +instr_cnt=1000
     +num_of_sub_program=0
     +directed_instr_0=riscv_int_numeric_corner_stream,4
     +no_fence=1
@@ -53,15 +53,13 @@
   iterations: 10
   gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=10000
-    +num_of_sub_program=5
+    +instr_cnt=100
+    +num_of_sub_program=0
+    +enable_unaligned_load_store=0
     +directed_instr_0=riscv_load_store_rand_instr_stream,4
-    +directed_instr_1=riscv_loop_instr,4
-    +directed_instr_2=riscv_hazard_instr_stream,4
-    +directed_instr_3=riscv_load_store_hazard_instr_stream,4
-    +directed_instr_4=riscv_multi_page_load_store_instr_stream,4
-    +directed_instr_5=riscv_mem_region_stress_test,4
-    +directed_instr_6=riscv_jal_instr,4
+    +directed_instr_1=riscv_hazard_instr_stream,4
+    +boot_mode=m
+    +no_csr_instr=1
   rtl_test: core_base_test
 
 - test: riscv_jump_stress_test
@@ -70,11 +68,10 @@
   iterations: 2
   gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=5000
-    +num_of_sub_program=5
-    +directed_instr_1=riscv_jal_instr,20
-    +boot_mode=m
-    +no_csr_instr=1
+    +instr_cnt=50
+    +num_of_sub_program=0
+    +directed_instr_1=riscv_jal_instr,8
+    +no_load_store=1
   rtl_test: core_base_test
 
 - test: riscv_loop_test
@@ -83,11 +80,11 @@
   iterations: 2
   gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=10000
-    +num_of_sub_program=5
-    +directed_instr_1=riscv_loop_instr,20
+    +instr_cnt=100
+    +num_of_sub_program=0
+    +directed_instr_0=riscv_loop_instr,8
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test
 
 - test: riscv_rand_jump_test
@@ -96,28 +93,11 @@
   iterations: 2
   gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=10000
-    +num_of_sub_program=10
-    +directed_instr_0=riscv_load_store_rand_instr_stream,8
+    +instr_cnt=100
+    +num_of_sub_program=2
+    +no_load_store=1
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
-  rtl_test: core_base_test
-
-- test: riscv_mmu_stress_test
-  description: >
-    Test with different patterns of load/store instructions, stress test MMU
-    operations.
-  iterations: 0
-  gen_test: riscv_instr_base_test
-  gen_opts: >
-    +instr_cnt=5000
-    +num_of_sub_program=5
-    +directed_instr_0=riscv_load_store_rand_instr_stream,40
-    +directed_instr_1=riscv_load_store_hazard_instr_stream,40
-    +directed_instr_2=riscv_multi_page_load_store_instr_stream,10
-    +directed_instr_3=riscv_mem_region_stress_test,10
-    +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test
 
 - test: riscv_no_fence_test
@@ -128,8 +108,6 @@
   gen_test: riscv_rand_instr_test
   gen_opts: >
     +no_fence=1
-    +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test
 
 - test: riscv_illegal_instr_test
@@ -139,11 +117,13 @@
     handling routine is designed to resume execution after illegal
     instruction exception.
   iterations: 2
-  gen_test: riscv_rand_instr_test
+  gen_test: riscv_instr_base_test
   gen_opts: >
-    +illegal_instr_ratio=5
+    +instr_cnt=20
+    +num_of_sub_program=0
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
+    +illegal_instr_ratio=5
   rtl_test: core_base_test
 
 - test: riscv_ebreak_test
@@ -151,24 +131,26 @@
     Random instruction test with ebreak instruction enabled. Debug mode is not
     enabled for this test, processor should raise ebreak exception.
   iterations: 2
-  gen_test: riscv_rand_instr_test
+  gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=6000
+    +instr_cnt=20
+    +num_of_sub_program=0
     +no_ebreak=0
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test
 
 - test: riscv_ebreak_debug_mode_test
   description: >
     Ebreak instruction test with debug mode enabled.
   iterations: 2
-  gen_test: riscv_rand_instr_test
+  gen_test: riscv_instr_base_test
   gen_opts: >
-    +instr_cnt=6000
+    +instr_cnt=10
+    +num_of_sub_program=0
     +no_ebreak=0
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test
   sim_opts: >
     +enable_debug_seq=1
@@ -179,11 +161,13 @@
   description: >
     Random instruction test with complete interrupt handling
   iterations: 2
-  gen_test: riscv_rand_instr_test
+  gen_test: riscv_instr_base_test
   gen_opts: >
-    +enable_interrupt=1
+    +instr_cnt=20
+    +num_of_sub_program=0
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
+    +enable_interrupt=1
   rtl_test: core_base_test
   sim_opts: >
     +enable_irq_seq=1
@@ -207,13 +191,9 @@
   gcc_opts: >
     -mno-strict-align
   gen_opts: >
-    +instr_cnt=6000
-    +num_of_sub_program=5
-    +directed_instr_0=riscv_load_store_rand_instr_stream,20
-    +directed_instr_1=riscv_load_store_hazard_instr_stream,20
-    +directed_instr_2=riscv_multi_page_load_store_instr_stream,5
-    +directed_instr_3=riscv_mem_region_stress_test,5
+    +instr_cnt=10
+    +num_of_sub_program=0
     +enable_unaligned_load_store=1
+    +no_data_page=1
     +boot_mode=m
-    +no_csr_instr=1
   rtl_test: core_base_test

@@ -62,11 +62,6 @@ class riscv_asm_program_gen extends uvm_object;
 
   // This is the main function to generate all sections of the program.
   virtual function void gen_program();
-    // Prevent generation of PMP exception handling code where PMP is not supported
-    if (!support_pmp) begin
-      cfg.pmp_cfg.enable_pmp_exception_handler = 1'b0;
-    end
-
     instr_stream.delete();
     // Generate program header
     gen_program_header();
@@ -457,8 +452,6 @@ class riscv_asm_program_gen extends uvm_object;
         RV32D, RV64D, RV32DC : misa[MISA_EXT_D] = 1'b1;
         RVV                  : misa[MISA_EXT_V] = 1'b1;
         RV32X, RV64X         : misa[MISA_EXT_X] = 1'b1;
-        RV32ZBA, RV32ZBB, RV32ZBC, RV32ZBS,
-        RV64ZBA, RV64ZBB, RV64ZBC, RV64ZBS : ; // No Misa bit for Zb* extensions
         default : `uvm_fatal(`gfn, $sformatf("%0s is not yet supported",
                                    supported_isa[i].name()))
       endcase
@@ -829,15 +822,8 @@ class riscv_asm_program_gen extends uvm_object;
   virtual function void setup_pmp(int hart);
     string instr[$];
     if (riscv_instr_pkg::support_pmp) begin
-      if(cfg.pmp_cfg.suppress_pmp_setup) begin
-        // When PMP setup is suppressed generate a configuration that gives unrestricted access to
-        // all memory for both M and U mode
-        cfg.pmp_cfg.gen_pmp_enable_all(cfg.scratch_reg, instr);
-      end else begin
-        cfg.pmp_cfg.setup_pmp();
-        cfg.pmp_cfg.gen_pmp_instr('{cfg.scratch_reg, cfg.gpr[0]}, instr);
-      end
-
+      cfg.pmp_cfg.setup_pmp();
+      cfg.pmp_cfg.gen_pmp_instr('{cfg.scratch_reg, cfg.gpr[0]}, instr);
       gen_section(get_label("pmp_setup", hart), instr);
     end
   endfunction
@@ -1216,10 +1202,16 @@ class riscv_asm_program_gen extends uvm_object;
     gen_signature_handshake(instr, CORE_STATUS, INSTR_FAULT_EXCEPTION);
     gen_signature_handshake(.instr(instr), .signature_type(WRITE_CSR), .csr(MCAUSE));
     if (cfg.pmp_cfg.enable_pmp_exception_handler) begin
-      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0],
-                                             cfg.pmp_reg[1]},
+      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0], cfg.pmp_reg[1]},
                                             INSTRUCTION_ACCESS_FAULT,
                                             instr);
+    end else begin
+      // Increment MEPC to skip the faulting instruction
+      instr = {instr,
+              $sformatf("csrr  x%0d, 0x%0x", cfg.gpr[0], MEPC),
+              $sformatf("addi  x%0d, x%0d, 4", cfg.gpr[0], cfg.gpr[0]),
+              $sformatf("csrw  0x%0x, x%0d", MEPC, cfg.gpr[0])
+      };
     end
     pop_gpr_from_kernel_stack(MSTATUS, MSCRATCH, cfg.mstatus_mprv, cfg.sp, cfg.tp, instr);
     instr.push_back("mret");
@@ -1232,10 +1224,16 @@ class riscv_asm_program_gen extends uvm_object;
     gen_signature_handshake(instr, CORE_STATUS, LOAD_FAULT_EXCEPTION);
     gen_signature_handshake(.instr(instr), .signature_type(WRITE_CSR), .csr(MCAUSE));
     if (cfg.pmp_cfg.enable_pmp_exception_handler) begin
-      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0],
-                                             cfg.pmp_reg[1]},
+      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0], cfg.pmp_reg[1]},
                                             LOAD_ACCESS_FAULT,
                                             instr);
+    end else begin
+      // Increment MEPC to skip the faulting instruction
+      instr = {instr,
+              $sformatf("csrr  x%0d, 0x%0x", cfg.gpr[0], MEPC),
+              $sformatf("addi  x%0d, x%0d, 4", cfg.gpr[0], cfg.gpr[0]),
+              $sformatf("csrw  0x%0x, x%0d", MEPC, cfg.gpr[0])
+      };
     end
     pop_gpr_from_kernel_stack(MSTATUS, MSCRATCH, cfg.mstatus_mprv, cfg.sp, cfg.tp, instr);
     instr.push_back("mret");
@@ -1248,10 +1246,16 @@ class riscv_asm_program_gen extends uvm_object;
     gen_signature_handshake(instr, CORE_STATUS, STORE_FAULT_EXCEPTION);
     gen_signature_handshake(.instr(instr), .signature_type(WRITE_CSR), .csr(MCAUSE));
     if (cfg.pmp_cfg.enable_pmp_exception_handler) begin
-      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0],
-                                             cfg.pmp_reg[1]},
+      cfg.pmp_cfg.gen_pmp_exception_routine({cfg.gpr, cfg.scratch_reg, cfg.pmp_reg[0], cfg.pmp_reg[1]},
                                             STORE_AMO_ACCESS_FAULT,
                                             instr);
+    end else begin
+      // Increment MEPC to skip the faulting instruction
+      instr = {instr,
+              $sformatf("csrr  x%0d, 0x%0x", cfg.gpr[0], MEPC),
+              $sformatf("addi  x%0d, x%0d, 4", cfg.gpr[0], cfg.gpr[0]),
+              $sformatf("csrw  0x%0x, x%0d", MEPC, cfg.gpr[0])
+      };
     end
     pop_gpr_from_kernel_stack(MSTATUS, MSCRATCH, cfg.mstatus_mprv, cfg.sp, cfg.tp, instr);
     instr.push_back("mret");

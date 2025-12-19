@@ -69,7 +69,6 @@
     -march=rv32ima_zicsr_zifencei
   rtl_test: core_base_test
 
-# bb.kang
 # Atomic instruction test (rv32ima supports atomic)
 - test: riscv_amo_test
   description: >

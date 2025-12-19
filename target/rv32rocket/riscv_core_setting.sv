@@ -21,17 +21,16 @@
 parameter int XLEN = 32;
 
 // Parameter for SATP mode, set to BARE if address translation is not supported
-parameter satp_mode_t SATP_MODE = BARE;
+parameter satp_mode_t SATP_MODE = SV32;
 
 // Supported Privileged mode
-privileged_mode_t supported_privileged_mode[] = {MACHINE_MODE};
+privileged_mode_t supported_privileged_mode[] = {MACHINE_MODE, SUPERVISOR_MODE, USER_MODE};
 
 // Unsupported instructions
 riscv_instr_name_t unsupported_instr[];
 
 // ISA supported by the processor
-// riscv_instr_group_t supported_isa[$] = {RV32I, RV32M, RV32C};
-riscv_instr_group_t supported_isa[$] = {RV32I, RV32M, RV32A};
+riscv_instr_group_t supported_isa[$] = {RV32I, RV32M, RV32A, RV32F, RV32C};
 
 // Interrupt mode support
 mtvec_mode_t supported_interrupt_mode[$] = {DIRECT, VECTORED};
@@ -41,10 +40,7 @@ mtvec_mode_t supported_interrupt_mode[$] = {DIRECT, VECTORED};
 int max_interrupt_vector_num = 16;
 
 // Physical memory protection support
-bit support_pmp = 0;
-
-// Enhanced physical memory protection support
-bit support_epmp = 0;
+bit support_pmp = 1;
 
 // Debug mode support
 bit support_debug_mode = 0;
@@ -53,7 +49,7 @@ bit support_debug_mode = 0;
 bit support_umode_trap = 0;
 
 // Support sfence.vma instruction
-bit support_sfence = 0;
+bit support_sfence = 1;
 
 // Support unaligned load/store
 bit support_unaligned_load_store = 1'b1;
@@ -101,13 +97,37 @@ privileged_reg_t implemented_csr[] = {
 `else
 const privileged_reg_t implemented_csr[] = {
 `endif
-    // Machine mode mode CSR
+    // User mode CSR
+    USTATUS,    // User status
+    UIE,        // User interrupt-enable register
+    UTVEC,      // User trap-handler base address
+    USCRATCH,   // Scratch register for user trap handlers
+    UEPC,       // User exception program counter
+    UCAUSE,     // User trap cause
+    UTVAL,      // User bad address or instruction
+    UIP,        // User interrupt pending
+    // Supervisor mode CSR
+    SSTATUS,    // Supervisor status
+    SEDELEG,    // Supervisor exception delegation register
+    SIDELEG,    // Supervisor interrupt delegation register
+    SIE,        // Supervisor interrupt-enable register
+    STVEC,      // Supervisor trap-handler base address
+    SCOUNTEREN, // Supervisor counter enable
+    SSCRATCH,   // Scratch register for supervisor trap handlers
+    SEPC,       // Supervisor exception program counter
+    SCAUSE,     // Supervisor trap cause
+    STVAL,      // Supervisor bad address or instruction
+    SIP,        // Supervisor interrupt pending
+    SATP,       // Supervisor address translation and protection (SV32)
+    // Machine mode CSR
     MVENDORID,  // Vendor ID
     MARCHID,    // Architecture ID
     MIMPID,     // Implementation ID
     MHARTID,    // Hardware thread ID
     MSTATUS,    // Machine status
     MISA,       // ISA and extensions
+    MEDELEG,    // Machine exception delegation register
+    MIDELEG,    // Machine interrupt delegation register
     MIE,        // Machine interrupt-enable register
     MTVEC,      // Machine trap-handler base address
     MCOUNTEREN, // Machine counter enable
@@ -115,11 +135,17 @@ const privileged_reg_t implemented_csr[] = {
     MEPC,       // Machine exception program counter
     MCAUSE,     // Machine trap cause
     MTVAL,      // Machine bad address or instruction
-    MIP         // Machine interrupt pending
+    MIP,        // Machine interrupt pending
+    // Floating point CSR
+    FCSR        // Floating point control and status register
 };
 
 // Implementation-specific custom CSRs
+`ifdef DSIM
 bit [11:0] custom_csr[] = {
+`else
+const bit [11:0] custom_csr[] = {
+`endif
 };
 
 // ----------------------------------------------------------------------------
@@ -131,9 +157,12 @@ interrupt_cause_t implemented_interrupt[] = {
 `else
 const interrupt_cause_t implemented_interrupt[] = {
 `endif
-    M_SOFTWARE_INTR,
-    M_TIMER_INTR,
-    M_EXTERNAL_INTR
+    S_SOFTWARE_INTR,  // Supervisor mode software interrupt
+    M_SOFTWARE_INTR,  // Machine mode software interrupt
+    S_TIMER_INTR,     // Supervisor mode timer interrupt
+    M_TIMER_INTR,     // Machine mode timer interrupt
+    S_EXTERNAL_INTR,  // Supervisor mode external interrupt
+    M_EXTERNAL_INTR   // Machine mode external interrupt
 };
 
 `ifdef DSIM
@@ -146,5 +175,12 @@ const exception_cause_t implemented_exception[] = {
     BREAKPOINT,
     LOAD_ADDRESS_MISALIGNED,
     LOAD_ACCESS_FAULT,
-    ECALL_MMODE
+    STORE_AMO_ADDRESS_MISALIGNED,
+    STORE_AMO_ACCESS_FAULT,
+    ECALL_UMODE,              // User mode ecall
+    ECALL_SMODE,              // Supervisor mode ecall
+    ECALL_MMODE,              // Machine mode ecall
+    INSTRUCTION_PAGE_FAULT,   // Page fault (SV32)
+    LOAD_PAGE_FAULT,          // Load page fault (SV32)
+    STORE_AMO_PAGE_FAULT      // Store page fault (SV32)
 };

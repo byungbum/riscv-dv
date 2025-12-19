@@ -64,7 +64,7 @@ def process_instr(trace):
             m.group("rd"), m.group("rs1"), m.group("imm"))
 
 
-def read_rocket_commit_instr(match):
+def read_rocket_commit_instr(match, rv32=False):
     """Extract instruction info from Rocket commit log regex match"""
     
     pri = match.group("pri")
@@ -76,12 +76,10 @@ def read_rocket_commit_instr(match):
     disasm = match.group("disasm")  # Embedded disassembly
     
     instr = RiscvInstructionTraceEntry()
-    # Convert to 64-bit address format
-    # bb.kang
-    # pc_64bit = addr[-16:] if len(addr) > 16 else addr.zfill(16)
-    # instr.pc = pc_64bit
-    pc_32bit = addr[-8:] if len(addr) > 8 else addr.zfill(8)
-    instr.pc = pc_32bit
+    # Convert to 64/32-bit address format
+    num_char = 8 if rv32 else 16
+    pc = addr[-num_char:] if len(addr) > num_char else addr.zfill(num_char)
+    instr.pc = pc
     instr.binary = binary
     instr.mode = pri
     
@@ -94,11 +92,9 @@ def read_rocket_commit_instr(match):
         else:
             reg_name = f"{reg_type}{reg_num}"
         
-        # Convert to 64-bit register value (spike.csv style)
-        # reg_val_64bit = reg_val[-16:] if len(reg_val) > 16 else reg_val.zfill(16)
-        # instr.gpr.append(f"{reg_name}:{reg_val_64bit}")
-        reg_val_32bit = reg_val[-8:] if len(reg_val) > 8 else reg_val.zfill(8)
-        instr.gpr.append(f"{reg_name}:{reg_val_32bit}")
+        # Convert to 64/32-bit register value
+        reg_value = reg_val[-num_char:] if len(reg_val) > num_char else reg_val.zfill(num_char)
+        instr.gpr.append(f"{reg_name}:{reg_value}")
     
     # Parse embedded disassembly
     if disasm and disasm.strip():
@@ -153,7 +149,7 @@ def read_rocket_commit_instr(match):
     return instr
 
 
-def read_rocket_commit_trace(path):
+def read_rocket_commit_trace(path, rv32=False):
     """Read a Rocket commit log, yielding executed instructions.
     
     This function skips instructions until it reaches the entry point
@@ -163,8 +159,7 @@ def read_rocket_commit_trace(path):
     """
     
     entry_point_reached = False
-    # entry_point = "0000000080000000"  # Entry point address (64-bit format) - 0x80000000
-    entry_point = "80000000"  # Entry point address (32-bit format) - 0x80000000
+    entry_point = "80000000" if rv32 else "0000000080000000" 
     
     logging.info("Using embedded disassembly from rocket log")
     
@@ -186,12 +181,11 @@ def read_rocket_commit_trace(path):
             
         # Skip until we reach entry point
         addr = match.group("addr")
-        # addr_64bit = addr[-16:] if len(addr) > 16 else addr.zfill(16)
-        addr_32bit = addr[-8:] if len(addr) > 8 else addr.zfill(8)
+        num_char = 8 if rv32 else 16
+        address = addr[-num_char:] if len(addr) > num_char else addr.zfill(num_char)
         
         if not entry_point_reached:
-            # if addr_64bit.lower() == entry_point.lower():
-            if addr_32bit.lower() == entry_point.lower():
+            if address.lower() == entry_point.lower():
                 entry_point_reached = True
                 # Don't continue here - process this instruction too
             else:
@@ -215,7 +209,7 @@ def read_rocket_commit_trace(path):
                         standalone_match.group("reg_num") == reg_num):
                         # Replace the placeholder value with the correct one
                         correct_val = standalone_match.group("val")
-                        logging.info(f"Replacing placeholder value for {reg_type}{reg_num} at PC {addr_32bit}: {reg_val} -> {correct_val}")
+                        logging.info(f"Replacing placeholder value for {reg_type}{reg_num} at PC {address}: {reg_val} -> {correct_val}")
                         # Create a new match dict with correct value
                         match_dict = match.groupdict()
                         match_dict["val"] = correct_val
@@ -228,7 +222,7 @@ def read_rocket_commit_trace(path):
                         match = FixedMatch(match_dict)
                         break
         
-        instr = read_rocket_commit_instr(match)
+        instr = read_rocket_commit_instr(match, rv32)
         
         # Check if this is an ecall instruction - if so, stop processing
         if instr.instr == "ecall":
@@ -240,7 +234,7 @@ def read_rocket_commit_trace(path):
         i += 1
 
 
-def process_rocket_commit_log(rocket_log, csv):
+def process_rocket_commit_log(rocket_log, csv, rv32=False):
     """Process Rocket commit log.
     
     Extract instruction and affected register information from Rocket commit log
@@ -254,7 +248,7 @@ def process_rocket_commit_log(rocket_log, csv):
         trace_csv = RiscvInstructionTraceCsv(csv_fd)
         trace_csv.start_new_trace()
         
-        for entry in read_rocket_commit_trace(rocket_log):
+        for entry in read_rocket_commit_trace(rocket_log, rv32):
             instrs_in += 1
             trace_csv.write_trace_entry(entry)
             instrs_out += 1
@@ -269,13 +263,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", type=str, help="Input Rocket commit log")
     parser.add_argument("--csv", type=str, help="Output trace csv file")
+    parser.add_argument("--rv32", dest="rv32", action="store_true",
+                        help="RV32 mode (32-bit addresses)")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
                         help="Verbose logging")
-    parser.set_defaults(verbose=False)
+    parser.set_defaults(verbose=False, rv32=False)
     args = parser.parse_args()
     setup_logging(args.verbose)
     # Process Rocket commit log
-    process_rocket_commit_log(args.log, args.csv)
+    process_rocket_commit_log(args.log, args.csv, args.rv32)
 
 
 if __name__ == "__main__":

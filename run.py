@@ -952,7 +952,6 @@ def load_config(args, cwd):
         if args.target == "rv32imc":
             args.mabi = "ilp32"
             args.isa = "rv32imc_zicsr_zifencei"
-        #bb.kang
         elif args.target == "rv32ima":
             args.mabi = "ilp32"
             args.isa = "rv32ima_zicsr_zifencei"
@@ -971,6 +970,9 @@ def load_config(args, cwd):
         elif args.target == "rv32i":
             args.mabi = "ilp32"
             args.isa = "rv32i_zicsr_zifencei"
+        elif args.target == "rv32rocket":
+            args.mabi = "ilp32f"
+            args.isa = "rv32imafc_zicsr_zifencei"
         elif args.target == "rv64imc":
             args.mabi = "lp64"
             args.isa = "rv64imc_zicsr_zifencei"
